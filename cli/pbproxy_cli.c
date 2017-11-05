@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 #include <stdlib.h>
 #include <netinet/in.h>
-
+#include <arpa/inet.h>
 void parseArgs(parsedArgs *args, char **argv, int n) {
 	/*for(int i = 1; i < n; i++) {
 		if(strcmp(argv[i], "-i") == 0 ) {		
@@ -50,41 +50,34 @@ int main(int argc, char** argv) {
 	parsedArgs *args = (parsedArgs*)malloc(sizeof(parsedArgs));
 	parseArgs(args, argv, argc);
 	printf("\n Port: %d, File: %s, Dest: %d", args->port, args->file, args->destPort);
-	int serverFd, newSocket;
 	struct sockaddr_in address;
-	int opt = 1;
-	int addrLen = sizeof(address);
- 	char buffer[1024] = {0};
-	char *hello = "Hello from server";
-      
-	if ((serverFd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
-		perror("socket failed");
-		exit(EXIT_FAILURE);
+	int sock = 0;
+	struct sockaddr_in serv_addr;
+	char *hello = "Hello from client";
+	char buffer[1024] = {0};
+	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        	printf("\n Socket creation error \n");
+       		return -1;
 	}
-      
-	if (setsockopt(serverFd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) {
-		perror("setsockopt");
-		exit(EXIT_FAILURE);
+
+	memset(&serv_addr, '0', sizeof(serv_addr));
+
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_port = htons(args->port);
+
+	if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) {
+		printf("\nInvalid address/ Address not supported \n");
+		return -1;
+    	}
+  
+	if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    	{
+        	printf("\nConnection Failed \n");
+		return -1;
 	}
-	address.sin_family = AF_INET;
-	address.sin_addr.s_addr = INADDR_ANY;
-	address.sin_port = htons(args->port);
-      
-	if (bind(serverFd, (struct sockaddr *)&address, sizeof(address))<0) {
-		perror("bind failed");
-		exit(EXIT_FAILURE);
-	}
-	if (listen(serverFd, 3) < 0) {
-		perror("listen");
-		exit(EXIT_FAILURE);
-	}
-	if ((newSocket = accept(serverFd, (struct sockaddr *)&address, (socklen_t*)&addrLen))<0) {
-		perror("accept");
-		exit(EXIT_FAILURE);
-	}
-	read( newSocket , buffer, 1024);
-	printf("%s\n",buffer );
-	send(newSocket , hello , strlen(hello) , 0 );
+	send(sock , hello , strlen(hello) , 0 );
 	printf("Hello message sent\n");
+	read( sock , buffer, 1024);
+	printf("%s\n",buffer );
 	return 0;
 }
