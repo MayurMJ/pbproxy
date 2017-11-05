@@ -74,17 +74,19 @@ int main(int argc, char** argv) {
 		perror("bind failed");
 		exit(EXIT_FAILURE);
 	}
-	if (listen(serverFd, 3) < 0) {
-		perror("listen");
-		exit(EXIT_FAILURE);
+	while(1) {
+		if (listen(serverFd, 3) < 0) {
+			perror("listen");
+			exit(EXIT_FAILURE);
+		}
+		if ((newSocket = accept(serverFd, (struct sockaddr *)&address, (socklen_t*)&addrLen))<0) {
+			perror("accept");
+			exit(EXIT_FAILURE);
+		}
+		read(newSocket , buffer, 1024);
+		printf("%s\n",buffer );
+		send(newSocket , hello , strlen(hello) , 0 );
+		printf("Hello message sent\n");
 	}
-	if ((newSocket = accept(serverFd, (struct sockaddr *)&address, (socklen_t*)&addrLen))<0) {
-		perror("accept");
-		exit(EXIT_FAILURE);
-	}
-	read( newSocket , buffer, 1024);
-	printf("%s\n",buffer );
-	send(newSocket , hello , strlen(hello) , 0 );
-	printf("Hello message sent\n");
 	return 0;
 }
