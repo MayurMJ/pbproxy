@@ -7,4 +7,7 @@ typedef struct pArgs {
 	char* file;
 	int destPort;
 }parsedArgs;
+
+int startServer(parsedArgs*);
+int startClient(parsedArgs*);
 #endif
