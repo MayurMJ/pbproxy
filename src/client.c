@@ -8,7 +8,7 @@
 #include <netinet/in.h>
 #include "pbheader.h"
 
-char *encrypt(char *msg, int length) {
+char *encrypt(char *msg, int length, const char* enc_key) {
 	AES_KEY key;
 	char iv[AES_BLOCK_SIZE];
 	char *text = malloc(sizeof(char) * length + AES_BLOCK_SIZE);
@@ -18,7 +18,6 @@ char *encrypt(char *msg, int length) {
 	memset(encrypted_text, 0, sizeof(char) * length);
 	char *ret = encrypted_text;
 	ctr state;
-	const char* enc_key = "1234567812345678";
 	if(!RAND_bytes(iv, AES_BLOCK_SIZE)) {
 		fprintf(stderr, "Could not create random bytes.");
 		exit(1);
@@ -40,6 +39,11 @@ char *encrypt(char *msg, int length) {
 }
 
 int startClient(parsedArgs *args) {
+        FILE *fp;
+        fp = fopen(args->file, "r");
+        char buff[4096] = {0};
+        if(fp)
+                fgets(buff, 4096, (FILE*)fp);	
 	struct sockaddr_in address;
 	int sock = 0;
 	struct sockaddr_in serv_addr;
@@ -68,7 +72,7 @@ int startClient(parsedArgs *args) {
         	printf("\nConnection Failed \n");
 		return -1;
 	}
-	char * sendMsg = encrypt(hello, strlen(hello));
+	char * sendMsg = encrypt(hello, strlen(hello), buff);
 	send(sock , sendMsg , strlen(sendMsg) , 0 );	
 	printf("%s\n", hello);
 	read( sock , buffer, 1024);

@@ -42,7 +42,7 @@ char* forwardMsg(char *sendMsg, int length) {
 	return (buffer);
 }
 
-char* decrypt(char *msg, int length) {
+char* decrypt(char *msg, int length, const char *enc_key) {
 	char iv[AES_BLOCK_SIZE];
 	for(int i = 0; i < AES_BLOCK_SIZE; i++) {
 		iv[i] = *msg;
@@ -55,7 +55,6 @@ char* decrypt(char *msg, int length) {
 	
         char *ret = encrypted_text;
         ctr state;
-        const char* enc_key = "1234567812345678";
         if (AES_set_encrypt_key(enc_key, 128, &key) < 0) {
                 fprintf(stderr, "Could not set encryption key.");
                 exit(1);
@@ -70,8 +69,11 @@ char* decrypt(char *msg, int length) {
 }
 
 int startServer(parsedArgs *args) {
-	//FILE *fp;
-	//fp = fopen(args->file, "r");
+	FILE *fp;
+	fp = fopen(args->file, "r");
+	char buff[4096] = {0};
+	if(fp)
+		fgets(buff, 4096, (FILE*)fp);
 	int serverFd, newSocket;
 	struct sockaddr_in address;
 	int opt = 1;
@@ -106,11 +108,11 @@ int startServer(parsedArgs *args) {
 			exit(EXIT_FAILURE);
 		}
 		read(newSocket , buffer, 1024);
-		char *ret = decrypt(buffer, strlen(buffer));
+		char *ret = decrypt(buffer, strlen(buffer), buff);
 		char *replyBack = forwardMsg(ret, strlen(ret));
 		//printf("%s\n", decrypt(buffer, strlen(buffer)));
 		send(newSocket , replyBack, strlen(replyBack) , 0 );
-		free (ret);
+		//free (ret);
 		//free (replyBack);
 		//printf("Hello message sent\n");
 	}
