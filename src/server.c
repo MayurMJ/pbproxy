@@ -1,4 +1,5 @@
 #include <string.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -6,6 +7,40 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include "pbheader.h"
+
+
+char* forwardMsg(char *sendMsg, int length) {
+	struct sockaddr_in address;
+        int sock = 0;
+        struct sockaddr_in serv_addr;
+	char *buffer = (char *) malloc (sizeof(char) * 1024);
+	memset(buffer, 0, 1024);
+        if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+                printf("\n Socket creation error \n");
+                return "Failed";
+        }
+
+        memset(&serv_addr, '0', sizeof(serv_addr));
+
+        serv_addr.sin_family = AF_INET;
+        serv_addr.sin_port = htons(22);
+
+        if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) {
+                printf("\nInvalid address/ Address not supported \n");
+                return "Failed";
+        }
+
+        if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+        {
+                printf("\nConnection Failed \n");
+                return "Failed";
+        }
+        send(sock , sendMsg , strlen(sendMsg) , 0 );
+        read( sock , buffer, 1024);
+	printf("Forwarded Message: %s\n",buffer );
+        free(sendMsg);
+	return (buffer);
+}
 
 char* decrypt(char *msg, int length) {
 	char iv[AES_BLOCK_SIZE];
@@ -35,6 +70,8 @@ char* decrypt(char *msg, int length) {
 }
 
 int startServer(parsedArgs *args) {
+	//FILE *fp;
+	//fp = fopen(args->file, "r");
 	int serverFd, newSocket;
 	struct sockaddr_in address;
 	int opt = 1;
@@ -70,9 +107,11 @@ int startServer(parsedArgs *args) {
 		}
 		read(newSocket , buffer, 1024);
 		char *ret = decrypt(buffer, strlen(buffer));
-		printf("%s\n", decrypt(buffer, strlen(buffer)));
-		send(newSocket , hello , strlen(hello) , 0 );
+		char *replyBack = forwardMsg(ret, strlen(ret));
+		//printf("%s\n", decrypt(buffer, strlen(buffer)));
+		send(newSocket , replyBack, strlen(replyBack) , 0 );
 		free (ret);
+		//free (replyBack);
 		//printf("Hello message sent\n");
 	}
 	return 0;
