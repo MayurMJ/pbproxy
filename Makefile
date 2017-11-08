@@ -2,7 +2,7 @@ CPP_FILES := $(wildcard src/*.c)
 OBJ_FILES := $(addprefix obj/,$(notdir $(CPP_FILES:.c=.o)))
 #CPP_CLI_FILES := $(wildcard cli/*.c)
 #OBJ_CLI_FILES := $(addprefix obj_cli/,$(notdir $(CPP_CLI_FILES:.c=.o)))
-LD_FLAGS :=
+LD_FLAGS := -lm -lcrypto -lssl
 CC_FLAGS := -I include/
 
 
