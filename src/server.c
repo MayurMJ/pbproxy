@@ -8,16 +8,39 @@
 #include <netinet/in.h>
 #include "pbheader.h"
 
+void *sshCom(void *threadArgs) {
+	tArgs *tA = (tArgs *) threadArgs;
+	while(1) {
+ 		char buffer[8192] = {0};
+		int n = read(tA->socket , buffer, 8192);
+		if(n > 0) {
+        		send(tA->socket2 , buffer, n , 0 );
+			//printf("\n Buffer: %s", buffer);
+		}
+	}
+}
 
-char* forwardMsg(char *sendMsg, int length, parsedArgs *args) {
+void *pbCom(void *threadArgs) {
+	tArgs *tA = (tArgs *) threadArgs;
+	while(1) {
+ 		char buffer[8192] = {0};
+		int n = read(tA->socket2 , buffer, 8192);
+		if(n > 0) {
+        		send(tA->socket2 , buffer, n , 0 );	
+			//printf("\n Buffer2: %s", buffer);
+		}
+	}
+}
+
+int createSSHConnection(parsedArgs *args) {
 	struct sockaddr_in address;
         int sock = 0;
         struct sockaddr_in serv_addr;
-	char *buffer = (char *) malloc (sizeof(char) * 1024);
-	memset(buffer, 0, 1024);
+	//char *buffer = (char *) malloc (sizeof(char) * 1024);
+	//memset(buffer, 0, 1024);
         if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
                 printf("\n Socket creation error \n");
-                return "Failed";
+                return -1;
         }
 
         memset(&serv_addr, '0', sizeof(serv_addr));
@@ -27,19 +50,19 @@ char* forwardMsg(char *sendMsg, int length, parsedArgs *args) {
 
         if(inet_pton(AF_INET, args->dest[0], &serv_addr.sin_addr)<=0) {
                 printf("\nInvalid address/ Address not supported \n");
-                return "Failed";
+                return -1;
         }
 
         if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
         {
                 printf("\nConnection Failed \n");
-                return "Failed";
+                return -1;
         }
-        send(sock , sendMsg , strlen(sendMsg) , 0 );
-        read( sock , buffer, 1024);
+        //send(sock , sendMsg , strlen(sendMsg) , 0 );
+        //read( sock , buffer, 1024);
 	//write(STDOUT_FILENO, buffer, strlen(buffer));
-        free(sendMsg);
-	return (buffer);
+        //free(sendMsg);
+	return sock;
 }
 
 char* decrypt(char *msg, int length, const char *enc_key) {
@@ -78,8 +101,6 @@ int startServer(parsedArgs *args) {
 	struct sockaddr_in address;
 	int opt = 1;
 	int addrLen = sizeof(address);
- 	char buffer[1024] = {0};
-	char *hello = "Hello from server";
       
 	if ((serverFd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
 		perror("socket failed");
@@ -98,23 +119,41 @@ int startServer(parsedArgs *args) {
 		perror("bind failed");
 		exit(EXIT_FAILURE);
 	}
-	while(1) {
-		if (listen(serverFd, 3) < 0) {
-			perror("listen");
-			exit(EXIT_FAILURE);
-		}
-		if ((newSocket = accept(serverFd, (struct sockaddr *)&address, (socklen_t*)&addrLen))<0) {
-			perror("accept");
-			exit(EXIT_FAILURE);
-		}
+	if (listen(serverFd, 3) < 0) {
+		perror("listen");
+		exit(EXIT_FAILURE);
+	}
+	if ((newSocket = accept(serverFd, (struct sockaddr *)&address, (socklen_t*)&addrLen))<0) {
+		perror("accept");
+		exit(EXIT_FAILURE);
+	}
+	int sshSocket = createSSHConnection(args);	
+	tArgs *ssht = (tArgs*) malloc(sizeof(tArgs));
+	ssht->socket = newSocket;
+	ssht->socket2 = sshSocket;
+	ssht->key = buff;
+	tArgs *pbt = (tArgs*) malloc(sizeof(tArgs));
+	pbt->socket = sshSocket;
+	pbt->socket2 = newSocket;
+	pbt->key = buff;
+	pthread_t tid, tid2;
+//	pthread_create(&tid, NULL, sshCom, (void*) ssht);	
+	pthread_create(&tid2, NULL, pbCom, (void*) pbt);
+//	pthread_join(tid, NULL);
+     	pthread_join(tid2, NULL);
+	/*while(1) {
+ 		char buffer[1024] = {0};
 		read(newSocket , buffer, 1024);
-		char *ret = decrypt(buffer, strlen(buffer), buff);
-		char *replyBack = forwardMsg(ret, strlen(ret), args);
+		//printf("We are%s\n", buffer);
+		//char *ret = decrypt(buffer, strlen(buffer), buff);
+		//char *replyBack = forwardMsg(ret, strlen(ret), args);
 		//printf("We are%s\n", decrypt(buffer, strlen(buffer), buff));
-		send(newSocket , replyBack, strlen(replyBack) , 0 );
+		//send(newSocket , replyBack, strlen(replyBack) , 0 );
+		//send(newSocket , ret,  strlen(ret) , 0 );	
+		send(newSocket , buffer,  strlen(buffer) , 0 );	
 		//free (ret);
 		//free (replyBack);
 		//printf("Hello message sent\n");
-	}
+	}*/
 	return 0;
 }

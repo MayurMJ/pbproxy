@@ -8,12 +8,35 @@
 #include <netinet/in.h>
 #include "pbheader.h"
 
-//void readIn(void *sock) {
-//	int i = (int) *sock;
-//}
+char *encrypt(char *msg, int length, const char* enc_key);
+void *readIn(void *tA) {
+	tArgs *threadargs = (tArgs *) tA;
+	while(1) {	
+		//char *hello = (char *) malloc(sizeof(char)* 1024); //"Hello from client";
+		//memset(hello, 0, 1024);
+		char hello[8192] = {0};
+		int n = read(STDIN_FILENO, hello, 8192);
+		//char *sendMsg = encrypt(hello, strlen(hello), threadargs->key);
+		if(n > 0)
+		send(threadargs->socket , hello , n , 0 );
+		//free(hello);
+		//free(sendMsg);
+	}
+}
+
+void *writeOut(void * socket) {	
+	int sock = *(int*)socket;
+	while(1) {	
+		char buffer[8192] = {0};
+		int n = read( sock , buffer, 8192);
+		if(n > 0)
+		write(STDOUT_FILENO, buffer, n);
+	}
+}
 
 
 char *encrypt(char *msg, int length, const char* enc_key) {
+	printf("\nmessage: %s, %d, %s",msg, length, enc_key);
 	AES_KEY key;
 	char iv[AES_BLOCK_SIZE];
 	char *text = malloc(sizeof(char) * length + AES_BLOCK_SIZE);
@@ -38,7 +61,8 @@ char *encrypt(char *msg, int length, const char* enc_key) {
 	AES_ctr128_encrypt(msg, encrypted_text, length, &key, state.iv, state.count, &state.num);
 	strcat(text, iv);
 	strcat(text, ret);
-	free(ret);
+	printf("wtf : %s", text);
+	//free(ret);
 	return text;
 	
 }
@@ -53,7 +77,6 @@ int startClient(parsedArgs *args) {
 	int sock = 0;
 	struct sockaddr_in serv_addr;
 
-	char buffer[1024] = {0};
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         	printf("\n Socket creation error \n");
        		return -1;
@@ -74,19 +97,19 @@ int startClient(parsedArgs *args) {
         	printf("\nConnection Failed \n");
 		return -1;
 	}
-	//pthread_t tid;
-	//pthread_create(&tid, NULL, readIn, void(*) &sock);	
-	char *hello = (char *) malloc(sizeof(char)* 1024); //"Hello from client";
-	memset(hello, 0, 1024);
-	read(STDIN_FILENO, hello, 1024);
-	char *sendMsg = encrypt(hello, strlen(hello), buff);
-	send(sock , sendMsg , strlen(sendMsg) , 0 );	
+	tArgs *ta = (tArgs*) malloc(sizeof(tArgs));
+	ta->socket = sock;
+	ta->key = buff;
+	pthread_t tid, tid2;
+	pthread_create(&tid, NULL, readIn, (void*) ta);	
+	pthread_create(&tid2, NULL, writeOut, (void*) &sock);
+	pthread_join(tid, NULL);
+     	pthread_join(tid2, NULL);
+	
 	//printf("%s\n", hello);
-	read( sock , buffer, 1024);
-	write(STDOUT_FILENO, buffer, strlen(buffer));
 	//write(STDOUT_FILENO, buffer, strlen(buffer));
 	//printf("%s\n",buffer );
-	free(sendMsg);
-	free(hello);
+	//free(sendMsg);
+	//free(hello);
 	return 0;
 }

@@ -4,6 +4,7 @@
 #include <openssl/rand.h>
 #include <stdio.h>
 #include <string.h>
+#include <pthread.h>
 
 typedef struct pArgs {
 	int port;
@@ -16,6 +17,13 @@ typedef struct ctrstruct {
 	char count[AES_BLOCK_SIZE];
 	char iv[AES_BLOCK_SIZE];
 }ctr;
+
+
+typedef struct threadArgs {
+	int socket;
+	int socket2;
+	const char* key;
+}tArgs;
 
 int startServer(parsedArgs*);
 int startClient(parsedArgs*);
