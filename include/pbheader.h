@@ -8,7 +8,7 @@
 typedef struct pArgs {
 	int port;
 	char* file;
-	int destPort;
+	char* dest[2];
 }parsedArgs;
 
 typedef struct ctrstruct {

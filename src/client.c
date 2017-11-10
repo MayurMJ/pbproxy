@@ -8,6 +8,11 @@
 #include <netinet/in.h>
 #include "pbheader.h"
 
+//void readIn(void *sock) {
+//	int i = (int) *sock;
+//}
+
+
 char *encrypt(char *msg, int length, const char* enc_key) {
 	AES_KEY key;
 	char iv[AES_BLOCK_SIZE];
@@ -47,10 +52,7 @@ int startClient(parsedArgs *args) {
 	struct sockaddr_in address;
 	int sock = 0;
 	struct sockaddr_in serv_addr;
-	char *hello = (char *) malloc(sizeof(char)* 1024); //"Hello from client";
-	memset(hello, 0, 1024);
-	printf("\nPlease Enter Text to send: ");
-	fgets(hello,1024,stdin);
+
 	char buffer[1024] = {0};
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         	printf("\n Socket creation error \n");
@@ -60,9 +62,9 @@ int startClient(parsedArgs *args) {
 	memset(&serv_addr, '0', sizeof(serv_addr));
 
 	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_port = htons(args->destPort);
+	serv_addr.sin_port = htons(atoi(args->dest[1]));
 
-	if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) {
+	if(inet_pton(AF_INET, args->dest[0], &serv_addr.sin_addr)<=0) {
 		printf("\nInvalid address/ Address not supported \n");
 		return -1;
     	}
@@ -72,11 +74,18 @@ int startClient(parsedArgs *args) {
         	printf("\nConnection Failed \n");
 		return -1;
 	}
-	char * sendMsg = encrypt(hello, strlen(hello), buff);
+	//pthread_t tid;
+	//pthread_create(&tid, NULL, readIn, void(*) &sock);	
+	char *hello = (char *) malloc(sizeof(char)* 1024); //"Hello from client";
+	memset(hello, 0, 1024);
+	read(STDIN_FILENO, hello, 1024);
+	char *sendMsg = encrypt(hello, strlen(hello), buff);
 	send(sock , sendMsg , strlen(sendMsg) , 0 );	
-	printf("%s\n", hello);
+	//printf("%s\n", hello);
 	read( sock , buffer, 1024);
-	printf("%s\n",buffer );
+	write(STDOUT_FILENO, buffer, strlen(buffer));
+	//write(STDOUT_FILENO, buffer, strlen(buffer));
+	//printf("%s\n",buffer );
 	free(sendMsg);
 	free(hello);
 	return 0;

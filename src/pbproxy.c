@@ -21,8 +21,12 @@ void parseArgs(parsedArgs *args, char **argv, int n) {
 		default:
 			exit(0);
 	}
+	int i = 0;
 	for (index = optind; index < n; index++) {
-		args->destPort = atoi(argv[index]);
+		if(i < 2) {
+			args->dest[i] = argv[index];
+			i++;
+		}
 	}
 }
 
@@ -30,7 +34,7 @@ int main(int argc, char** argv) {
 	parsedArgs *args = (parsedArgs*)malloc(sizeof(parsedArgs));
 	args->port = -1;
 	parseArgs(args, argv, argc);
-	printf("\n Port: %d, File: %s, Dest: %d", args->port, args->file, args->destPort);
+	//printf("\n Port: %d, File: %s, Dest: %s %s", args->port, args->file, args->dest[0], args->dest[1]);
 	if(args->port != -1) {
 		startServer(args);
 	}

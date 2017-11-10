@@ -9,7 +9,7 @@
 #include "pbheader.h"
 
 
-char* forwardMsg(char *sendMsg, int length) {
+char* forwardMsg(char *sendMsg, int length, parsedArgs *args) {
 	struct sockaddr_in address;
         int sock = 0;
         struct sockaddr_in serv_addr;
@@ -23,9 +23,9 @@ char* forwardMsg(char *sendMsg, int length) {
         memset(&serv_addr, '0', sizeof(serv_addr));
 
         serv_addr.sin_family = AF_INET;
-        serv_addr.sin_port = htons(22);
+        serv_addr.sin_port = htons(atoi(args->dest[1]));
 
-        if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) {
+        if(inet_pton(AF_INET, args->dest[0], &serv_addr.sin_addr)<=0) {
                 printf("\nInvalid address/ Address not supported \n");
                 return "Failed";
         }
@@ -37,7 +37,7 @@ char* forwardMsg(char *sendMsg, int length) {
         }
         send(sock , sendMsg , strlen(sendMsg) , 0 );
         read( sock , buffer, 1024);
-	printf("Forwarded Message: %s\n",buffer );
+	//write(STDOUT_FILENO, buffer, strlen(buffer));
         free(sendMsg);
 	return (buffer);
 }
@@ -109,8 +109,8 @@ int startServer(parsedArgs *args) {
 		}
 		read(newSocket , buffer, 1024);
 		char *ret = decrypt(buffer, strlen(buffer), buff);
-		char *replyBack = forwardMsg(ret, strlen(ret));
-		//printf("%s\n", decrypt(buffer, strlen(buffer)));
+		char *replyBack = forwardMsg(ret, strlen(ret), args);
+		//printf("We are%s\n", decrypt(buffer, strlen(buffer), buff));
 		send(newSocket , replyBack, strlen(replyBack) , 0 );
 		//free (ret);
 		//free (replyBack);
