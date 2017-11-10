@@ -12,9 +12,9 @@ void *sshCom(void *threadArgs) {
 	tArgs *tA = (tArgs *) threadArgs;
 	while(1) {
  		char buffer[8192] = {0};
-		int n = read(tA->socket , buffer, 8192);
+		//int n = read(tA->socket , buffer, 8192);
 		if(n > 0) {
-        		send(tA->socket2 , buffer, n , 0 );
+        	//	send(tA->socket2 , buffer, n , 0 );
 			//printf("\n Buffer: %s", buffer);
 		}
 	}
@@ -26,7 +26,7 @@ void *pbCom(void *threadArgs) {
  		char buffer[8192] = {0};
 		int n = read(tA->socket2 , buffer, 8192);
 		if(n > 0) {
-        		send(tA->socket2 , buffer, n , 0 );	
+        		send(tA->socket , buffer, n , 0 );	
 			//printf("\n Buffer2: %s", buffer);
 		}
 	}
@@ -133,13 +133,13 @@ int startServer(parsedArgs *args) {
 	ssht->socket2 = sshSocket;
 	ssht->key = buff;
 	tArgs *pbt = (tArgs*) malloc(sizeof(tArgs));
-	pbt->socket = sshSocket;
-	pbt->socket2 = newSocket;
+	pbt->socket = newSocket;
+	pbt->socket2 = sshSocket;
 	pbt->key = buff;
 	pthread_t tid, tid2;
-//	pthread_create(&tid, NULL, sshCom, (void*) ssht);	
+	pthread_create(&tid, NULL, sshCom, (void*) ssht);	
 	pthread_create(&tid2, NULL, pbCom, (void*) pbt);
-//	pthread_join(tid, NULL);
+	pthread_join(tid, NULL);
      	pthread_join(tid2, NULL);
 	/*while(1) {
  		char buffer[1024] = {0};
