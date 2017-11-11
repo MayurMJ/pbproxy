@@ -8,7 +8,7 @@
 #include <netinet/in.h>
 #include "pbheader.h"
 
-char* decrypt(char *msg, int length, const char *enc_key);
+char* decrypt(char *msg, int length, const char *enc_keyi, char ret[8192]);
 char ivc_server[AES_BLOCK_SIZE] = {0};
 char ivs_server[AES_BLOCK_SIZE] = {0};
 void *sshCom(void *threadArgs) {
@@ -16,11 +16,12 @@ void *sshCom(void *threadArgs) {
 	while(1) {
  		char buffer[8192] = {0};
 		int n = read(tA->socket , buffer, 8192);
-		char *ret = decrypt(buffer, strlen(buffer), tA->key);
+		char ret[8192] = {0};
+		decrypt(buffer, n, tA->key, ret);
 		if(n <= 0) break;
 		if(n > 0) {
-        		send(tA->socket2 , buffer, n , 0 );
-        		//send(tA->socket2 , ret, n , 0 );
+        		//send(tA->socket2 , buffer, n , 0 );
+        		send(tA->socket2 , ret, n , 0 );
 			//printf("\n Buffer: %s", buffer);
 		}
 	}
@@ -72,13 +73,13 @@ int createSSHConnection(parsedArgs *args) {
 	return sock;
 }
 
-char* decrypt(char *msg, int length, const char *enc_key) {
+char* decrypt(char *msg, int length, const char *enc_key, char ret[8192]) {
         AES_KEY key;
         int bytes_to_encrypt = 0;
-        char *encrypted_text = (char *) malloc(sizeof(char) * length + 1);
-	memset(encrypted_text, 0, sizeof(char) * length + 1);
+        //char *encrypted_text = (char *) malloc(sizeof(char) * length + 1);
+	//memset(encrypted_text, 0, sizeof(char) * length + 1);
 	
-        char *ret = encrypted_text;
+        //char *ret = encrypted_text;
         ctr state;
         if (AES_set_encrypt_key(enc_key, 128, &key) < 0) {
                 fprintf(stderr, "Could not set encryption key.");
@@ -88,7 +89,7 @@ char* decrypt(char *msg, int length, const char *enc_key) {
         memset(state.count, 0, AES_BLOCK_SIZE);
         memset(state.iv + 8, 0, 8);
         memcpy(state.iv, ivc_server, 8);
-        AES_ctr128_encrypt(msg, encrypted_text, length, &key, state.iv, state.count, &state.num);
+        AES_ctr128_encrypt(msg, ret, length, &key, state.iv, state.count, &state.num);
         return ret; 
 }
 

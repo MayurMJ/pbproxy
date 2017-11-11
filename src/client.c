@@ -10,7 +10,7 @@
 
 char iv[AES_BLOCK_SIZE] = {0};
 char ivs[AES_BLOCK_SIZE]= {0};
-char *encrypt(char *msg, int length, const char* enc_key);
+char *encrypt(char *msg, int length, const char* enc_key, char ret[8192]);
 void *readIn(void *tA) {
 	tArgs *threadargs = (tArgs *) tA;
 	while(1) {	
@@ -18,11 +18,11 @@ void *readIn(void *tA) {
 		//memset(hello, 0, 1024);
 		char msg[8192] = {0};
 		int n = read(STDIN_FILENO, msg, 8192);
-		//char *sendMsg = encrypt(hello, strlen(hello), threadargs->key);
 		if(n > 0) {
-        	char *ret = encrypt(msg, strlen(msg), threadargs->key);
-		send(threadargs->socket , msg , n , 0 );
-		//send(threadargs->socket , ret , n , 0 );
+		char ret[8192] = {0};
+        	encrypt(msg, n, threadargs->key, ret);
+	//	send(threadargs->socket , msg , n , 0 );
+		send(threadargs->socket , ret , n , 0 );
 		}
 		//free(hello);
 		//free(sendMsg);
@@ -41,15 +41,15 @@ void *writeOut(void * socket) {
 }
 
 
-char *encrypt(char *msg, int length, const char* enc_key) {
+char *encrypt(char *msg, int length, const char* enc_key, char ret[8192]) {
 	//printf("\nmessage: %s, %d, %s",msg, length, enc_key);
 	AES_KEY key;
 	//char *text = malloc(sizeof(char) * length + AES_BLOCK_SIZE);
 	//memset(text, 0, sizeof(char) * length + AES_BLOCK_SIZE);
 	int bytes_to_encrypt = 0;
-	char *encrypted_text = (char *) malloc(sizeof(char) * length);
-	memset(encrypted_text, 0, sizeof(char) * length);
-	char *ret = encrypted_text;
+	//char *encrypted_text = (char *) malloc(sizeof(char) * length);
+	//memset(encrypted_text, 0, sizeof(char) * length);
+	//char *ret = encrypted_text;
 	ctr state;
 	if (AES_set_encrypt_key(enc_key, 128, &key) < 0) {
 		fprintf(stderr, "Could not set encryption key.");
@@ -59,7 +59,7 @@ char *encrypt(char *msg, int length, const char* enc_key) {
 	memset(state.count, 0, AES_BLOCK_SIZE);
 	memset(state.iv + 8, 0, 8);
  	memcpy(state.iv, iv, 8);
-	AES_ctr128_encrypt(msg, encrypted_text, length, &key, state.iv, state.count, &state.num);
+	AES_ctr128_encrypt(msg, ret, length, &key, state.iv, state.count, &state.num);
 	//strcat(text, iv);
 	//strcat(text, ret);
 	//free(ret);
