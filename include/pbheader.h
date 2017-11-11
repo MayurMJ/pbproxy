@@ -24,6 +24,7 @@ typedef struct threadArgs {
 	int socket2;
 	ctr state;
 	AES_KEY key;
+	char buff[100];
 }tArgs;
 
 int startServer(parsedArgs*);

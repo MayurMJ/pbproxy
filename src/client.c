@@ -8,17 +8,37 @@
 #include <netinet/in.h>
 #include "pbheader.h"
 
-char iv[AES_BLOCK_SIZE] = {0};
-char ivs[AES_BLOCK_SIZE]= {0};
+//char iv[AES_BLOCK_SIZE] = {0};
+//char ivs[AES_BLOCK_SIZE]= {0};
 void *readIn(void *tA) {
 	tArgs *threadargs = (tArgs *) tA;
 	while(1) {	
-		char msg[8192] = {0};
-		int n = read(STDIN_FILENO, msg, 8192);
+		char msg[10000] = {0};
+		size_t n= read(STDIN_FILENO, msg, 8192);
+                //fprintf(stderr, "\n Length: %d", n);
 		if(n > 0) {
-			char ret[8192] = {0};
-			AES_ctr128_encrypt(msg, ret, n, &(threadargs->key), threadargs->state.iv, threadargs->state.count, &(threadargs->state.num));
-			send(threadargs->socket , ret , n , 0 );
+			ctr state;
+			char iv[AES_BLOCK_SIZE] = {0};
+			if(!RAND_bytes(iv, AES_BLOCK_SIZE)) {
+                		fprintf(stderr, "Could not create random bytes.");
+                		exit(1);
+        		}
+        		AES_KEY key;
+        		if (AES_set_encrypt_key(threadargs->buff, 128, &key) < 0) {
+                		fprintf(stderr, "Could not set encryption key.");
+                		exit(1);
+        		}
+        		state.num = 0;
+        		memset(state.count, 0, AES_BLOCK_SIZE);
+        		memset(state.iv + 8, 0, 8);
+        		memcpy(state.iv, iv, 8);
+			char ret[10000] = {0};
+			AES_ctr128_encrypt(msg, ret, n, &key, state.iv, state.count, &state.num);
+	        	char sendmsg[10000] = {0};
+			//for(int i = 0; i < AES_BLOCK_SIZE; i++) {
+			memcpy(sendmsg, iv, AES_BLOCK_SIZE);
+			memcpy(sendmsg + AES_BLOCK_SIZE, ret, n);	
+			send(threadargs->socket , sendmsg , n + AES_BLOCK_SIZE , 0 );
 		}
 	}
 }
@@ -26,13 +46,29 @@ void *readIn(void *tA) {
 void *writeOut(void *threadargs) {	
 	tArgs *tA = (tArgs *) threadargs;
 	while(1) {	
-		char msg[8192] = {0};
-		int n = read( tA->socket , msg, 8192);
+		char msg[10000] = {0};
+		size_t n = read( tA->socket , msg, 8192);
 		if(n <= 0) break;
 		if(n > 0) {
-			char ret[8192] = {0};
-			AES_ctr128_encrypt(msg, ret, n, &(tA->key), tA->state.iv, tA->state.count, &(tA->state.num));	
-			write(STDOUT_FILENO, ret, n);
+		        ctr state;
+                        char iv[AES_BLOCK_SIZE] = {0};
+                        for(int i = 0; i < AES_BLOCK_SIZE; i++) {
+                                iv[i] = msg[i];
+                        }
+                        AES_KEY key;
+                        if (AES_set_encrypt_key(tA->buff, 128, &key) < 0) {
+                                fprintf(stderr, "Could not set encryption key.");
+                                exit(1);
+                        }
+                        state.num = 0;
+                        memset(state.count, 0, AES_BLOCK_SIZE);
+                        memset(state.iv + 8, 0, 8);
+                        memcpy(state.iv, iv, 8);
+
+                        char ret[10000] = {0};
+                        AES_ctr128_encrypt(msg + AES_BLOCK_SIZE, ret, n - AES_BLOCK_SIZE, &(key), state.iv, state.count, &(state.num));
+			//write(STDOUT_FILENO, ret , n - AES_BLOCK_SIZE);
+			write(STDOUT_FILENO, msg , n);
 		}
 	}
 }
@@ -67,16 +103,17 @@ int startClient(parsedArgs *args) {
         	fprintf(stderr,"\nConnection Failed \n");
 		return -1;
 	}
-	if(!RAND_bytes(iv, AES_BLOCK_SIZE)) {
+/*	if(!RAND_bytes(iv, AES_BLOCK_SIZE)) {
 		fprintf(stderr, "Could not create random bytes.");
 		exit(1);
-	}
-	send(sock, iv , AES_BLOCK_SIZE , 0 );
-	int n = read( sock , ivs, 8192);	
+	}*/
+	//send(sock, iv , AES_BLOCK_SIZE , 0 );
+	//int n = read( sock , ivs, 8192);	
 
 	tArgs *ta = (tArgs*) malloc(sizeof(tArgs));
 	ta->socket = sock;
-	AES_KEY key;
+	strcpy(ta->buff, buff);
+	/*AES_KEY key;
         if (AES_set_encrypt_key(buff, 128, &key) < 0) {
                 fprintf(stderr, "Could not set encryption key.");
                 exit(1);
@@ -91,14 +128,15 @@ int startClient(parsedArgs *args) {
         if (AES_set_encrypt_key(buff, 128, &key1) < 0) {
                 fprintf(stderr, "Could not set encryption key.");
                 exit(1);
-        }
+        }*/
 	tArgs *ta1 = (tArgs*) malloc(sizeof(tArgs));
 	ta1->socket = sock;
-        ta1->state.num = 0;
-        memset(ta1->state.count, 0, AES_BLOCK_SIZE);
-        memset(ta1->state.iv + 8, 0, 8);
-        memcpy(ta1->state.iv, ivs, 8);
-	ta1->key = key1;
+	strcpy(ta1->buff, buff);
+        //ta1->state.num = 0;
+        //memset(ta1->state.count, 0, AES_BLOCK_SIZE);
+        //memset(ta1->state.iv + 8, 0, 8);
+        //memcpy(ta1->state.iv, ivs, 8);
+	//ta1->key = key1;
 
 	pthread_t tid, tid2;
 	pthread_create(&tid, NULL, readIn, (void*) ta);	

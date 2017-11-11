@@ -13,17 +13,69 @@ char ivs_server[AES_BLOCK_SIZE] = {0};
 void *sshCom(void *threadArgs) {
 	tArgs *tA = (tArgs *) threadArgs;
 	while(1) {
- 		char buffer[8192] = {0};
-		int n = read(tA->socket , buffer, 8192);
+ 		char buffer[10000] = {0};
+		size_t n = read(tA->socket , buffer, 8210);
 		if(n <= 0) break;
 		if(n > 0) {
-			
-			char ret[8192] = {0};
-        		AES_ctr128_encrypt(buffer, ret, n, &(tA->key), tA->state.iv, tA->state.count, &(tA->state.num));
-        		send(tA->socket2 , ret, n , 0 );
+			ctr state;
+			char iv[AES_BLOCK_SIZE];
+			for(int i = 0; i < AES_BLOCK_SIZE; i++) {
+				iv[i] = buffer[i];
+			}
+			AES_KEY key;
+                        if (AES_set_encrypt_key(tA->buff, 128, &key) < 0) {
+                                fprintf(stderr, "Could not set encryption key.");
+                                exit(1);
+                        }
+                        state.num = 0;
+                        memset(state.count, 0, AES_BLOCK_SIZE);
+                        memset(state.iv + 8, 0, 8);
+                        memcpy(state.iv, iv, 8);
+	
+			char ret[10000] = {0};
+        		AES_ctr128_encrypt(buffer + AES_BLOCK_SIZE, ret, n - AES_BLOCK_SIZE, &(key), state.iv, state.count, &(state.num));
+                	//fprintf(stderr, "\n Length:%d ",n - AES_BLOCK_SIZE);
+        		send(tA->socket2 , ret, n - AES_BLOCK_SIZE , 0 );
 		}
 	}
 }
+
+void *pbCom(void *threadArgs) {
+        tArgs *tA = (tArgs *) threadArgs;
+        while(1) {
+                char buffer[10000] = {0};
+                size_t n= read(tA->socket , buffer, 8192);
+                if(n <= 0) break;
+                if(n > 0) {
+			ctr state;
+			char iv[AES_BLOCK_SIZE] = {0};
+                        if(!RAND_bytes(iv, AES_BLOCK_SIZE)) {
+                                fprintf(stderr, "Could not create random bytes.");
+                                exit(1);
+                        }
+                        AES_KEY key;
+                        if (AES_set_encrypt_key(tA->buff, 128, &key) < 0) {
+                                fprintf(stderr, "Could not set encryption key.");
+                                exit(1);
+                        }
+                        state.num = 0;
+                        memset(state.count, 0, AES_BLOCK_SIZE);
+                        memset(state.iv + 8, 0, 8);
+                        memcpy(state.iv, iv, 8);
+                        char ret[10000] = {0};
+                        AES_ctr128_encrypt(buffer, ret, n, &key, state.iv, state.count, &state.num);
+                        char sendmsg[10000] = {0};
+                        //for(int i = 0; i < AES_BLOCK_SIZE; i++) {
+                        memcpy(sendmsg, iv, AES_BLOCK_SIZE);
+                        memcpy(sendmsg + AES_BLOCK_SIZE, ret, n);
+                        //send(threadargs->socket , sendmsg , n + AES_BLOCK_SIZE , 0 );
+                        //send(tA->socket2 , sendmsg, n + AES_BLOCK_SIZE, 0 );
+			send(tA->socket2, buffer, n, 0 );
+                }
+        }
+}
+
+
 
 int createSSHConnection(parsedArgs *args) {
 	struct sockaddr_in address;
@@ -89,17 +141,18 @@ int startServer(parsedArgs *args) {
 			fprintf(stderr,"accept");
 			exit(1);
 		}
-		if(!RAND_bytes(ivs_server, AES_BLOCK_SIZE)) {
+		/*if(!RAND_bytes(ivs_server, AES_BLOCK_SIZE)) {
 			fprintf(stderr, "Could not create random bytes.");
 			exit(1);
 		}
 		int n = read( newSocket , ivc_server, 8192);
-		send(newSocket, ivs_server, AES_BLOCK_SIZE , 0 );
+		send(newSocket, ivs_server, AES_BLOCK_SIZE , 0 );*/
 		int sshSocket = createSSHConnection(args);	
 		tArgs *ssht = (tArgs*) malloc(sizeof(tArgs));
 		ssht->socket = newSocket;
 		ssht->socket2 = sshSocket;
-		AES_KEY key;
+		strcpy(ssht->buff, buff);
+		/*AES_KEY key;
         	if (AES_set_encrypt_key(buff, 128, &key) < 0) {
                 	fprintf(stderr, "Could not set encryption key.");
                 	exit(1);
@@ -108,12 +161,13 @@ int startServer(parsedArgs *args) {
         	ssht->state.num = 0;
         	memset(ssht->state.count, 0, AES_BLOCK_SIZE);
        		memset(ssht->state.iv + 8, 0, 8);
-        	memcpy(ssht->state.iv, ivc_server, 8);
+        	memcpy(ssht->state.iv, ivc_server, 8);*/
 		
 		tArgs *pbt = (tArgs*) malloc(sizeof(tArgs));
 		pbt->socket2 = newSocket;
 		pbt->socket = sshSocket;
-		AES_KEY key1;
+		strcpy(pbt->buff, buff);
+		/*AES_KEY key1;
         	if (AES_set_encrypt_key(buff, 128, &key1) < 0) {
                 	fprintf(stderr, "Could not set encryption key.");
                 	exit(1);
@@ -122,10 +176,10 @@ int startServer(parsedArgs *args) {
         	pbt->state.num = 0;
         	memset(pbt->state.count, 0, AES_BLOCK_SIZE);
        		memset(pbt->state.iv + 8, 0, 8);
-        	memcpy(pbt->state.iv, ivs_server, 8);
+        	memcpy(pbt->state.iv, ivs_server, 8);*/
 		pthread_t tid, tid2;
 		pthread_create(&tid, NULL, sshCom, (void*) ssht);	
-		pthread_create(&tid2, NULL, sshCom, (void*) pbt);
+		pthread_create(&tid2, NULL, pbCom, (void*) pbt);
 	}
 	return 0;
 }
