@@ -14,30 +14,27 @@ char *encrypt(char *msg, int length, const char* enc_key, char ret[8192]);
 void *readIn(void *tA) {
 	tArgs *threadargs = (tArgs *) tA;
 	while(1) {	
-		//char *hello = (char *) malloc(sizeof(char)* 1024); //"Hello from client";
-		//memset(hello, 0, 1024);
 		char msg[8192] = {0};
 		int n = read(STDIN_FILENO, msg, 8192);
 		if(n > 0) {
 			char ret[8192] = {0};
 			AES_ctr128_encrypt(msg, ret, n, &(threadargs->key), threadargs->state.iv, threadargs->state.count, &(threadargs->state.num));
-        		//encrypt(msg, n, threadargs->key, ret);
-			//send(threadargs->socket , msg , n , 0 );
 			send(threadargs->socket , ret , n , 0 );
 		}
-		//free(hello);
-		//free(sendMsg);
 	}
 }
 
-void *writeOut(void * socket) {	
-	int sock = *(int*)socket;
+void *writeOut(void *threadargs) {	
+	tArgs *tA = (tArgs *) threadargs;
 	while(1) {	
-		char buffer[8192] = {0};
-		int n = read( sock , buffer, 8192);
-		if(n == -1) break;
-		if(n > 0)
-		write(STDOUT_FILENO, buffer, n);
+		char msg[8192] = {0};
+		int n = read( tA->socket , msg, 8192);
+		if(n <= 0) break;
+		if(n > 0) {
+			char ret[8192] = {0};
+			AES_ctr128_encrypt(msg, ret, n, &(tA->key), tA->state.iv, tA->state.count, &(tA->state.num));	
+			write(STDOUT_FILENO, ret, n);
+		}
 	}
 }
 
@@ -55,7 +52,6 @@ char *encrypt(char *msg, int length, const char* enc_key, char ret[8192]) {
  	memcpy(state.iv, iv, 8);
 	AES_ctr128_encrypt(msg, ret, length, &key, state.iv, state.count, &state.num);
 	return ret;
-	
 }
 
 int startClient(parsedArgs *args) {
@@ -115,9 +111,23 @@ int startClient(parsedArgs *args) {
         memset(ta->state.iv + 8, 0, 8);
         memcpy(ta->state.iv, iv, 8);
 	ta->key = key;
+	
+	AES_KEY key1;
+        if (AES_set_encrypt_key(buff, 128, &key1) < 0) {
+                fprintf(stderr, "Could not set encryption key.");
+                exit(1);
+        }
+	tArgs *ta1 = (tArgs*) malloc(sizeof(tArgs));
+	ta1->socket = sock;
+        ta1->state.num = 0;
+        memset(ta1->state.count, 0, AES_BLOCK_SIZE);
+        memset(ta1->state.iv + 8, 0, 8);
+        memcpy(ta1->state.iv, ivs, 8);
+	ta1->key = key1;
+
 	pthread_t tid, tid2;
 	pthread_create(&tid, NULL, readIn, (void*) ta);	
-	pthread_create(&tid2, NULL, writeOut, (void*) &sock);
+	pthread_create(&tid2, NULL, writeOut, (void*) ta1);
 	pthread_join(tid, NULL);
      	pthread_join(tid2, NULL);
 	

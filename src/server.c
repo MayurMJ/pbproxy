@@ -20,11 +20,8 @@ void *sshCom(void *threadArgs) {
 		if(n > 0) {
 			
 			char ret[8192] = {0};
-			//decrypt(buffer, n, tA->key, ret);
         		AES_ctr128_encrypt(buffer, ret, n, &(tA->key), tA->state.iv, tA->state.count, &(tA->state.num));
-        		//send(tA->socket2 , buffer, n , 0 );
         		send(tA->socket2 , ret, n , 0 );
-			//printf("\n Buffer: %s", buffer);
 		}
 	}
 }
@@ -36,8 +33,9 @@ void *pbCom(void *threadArgs) {
 		int n = read(tA->socket2 , buffer, 8192);
 		if(n <= 0) break;
 		if(n > 0) {
-        		send(tA->socket , buffer, n , 0 );	
-			//printf("\n Buffer2: %s", buffer);
+			char ret[8192] = {0};
+        		AES_ctr128_encrypt(buffer, ret, n, &(tA->key), tA->state.iv, tA->state.count, &(tA->state.num));
+        		send(tA->socket , ret, n , 0 );	
 		}
 	}
 }
@@ -118,7 +116,7 @@ int startServer(parsedArgs *args) {
 		perror("bind failed");
 		exit(EXIT_FAILURE);
 	}
-	//while(1) {
+	while(1) {
 		if (listen(serverFd, 3) < 0) {
 			perror("listen");
 			exit(EXIT_FAILURE);
@@ -158,13 +156,22 @@ int startServer(parsedArgs *args) {
 		tArgs *pbt = (tArgs*) malloc(sizeof(tArgs));
 		pbt->socket = newSocket;
 		pbt->socket2 = sshSocket;
+		AES_KEY key1;
+        	if (AES_set_encrypt_key(buff, 128, &key1) < 0) {
+                	fprintf(stderr, "Could not set encryption key.");
+                	exit(1);
+        	}
 		pbt->key = key;
+        	pbt->state.num = 0;
+        	memset(pbt->state.count, 0, AES_BLOCK_SIZE);
+       		memset(pbt->state.iv + 8, 0, 8);
+        	memcpy(pbt->state.iv, ivs_server, 8);
 		pthread_t tid, tid2;
 		pthread_create(&tid, NULL, sshCom, (void*) ssht);	
 		pthread_create(&tid2, NULL, pbCom, (void*) pbt);
-	//}
-	pthread_join(tid, NULL);
-     	pthread_join(tid2, NULL);
+	}
+	//pthread_join(tid, NULL);
+     	//pthread_join(tid2, NULL);
 	/*while(1) {
  		char buffer[1024] = {0};
 		read(newSocket , buffer, 1024);
