@@ -8,17 +8,22 @@
 #include <netinet/in.h>
 #include "pbheader.h"
 
+char iv[AES_BLOCK_SIZE] = {0};
+char ivs[AES_BLOCK_SIZE]= {0};
 char *encrypt(char *msg, int length, const char* enc_key);
 void *readIn(void *tA) {
 	tArgs *threadargs = (tArgs *) tA;
 	while(1) {	
 		//char *hello = (char *) malloc(sizeof(char)* 1024); //"Hello from client";
 		//memset(hello, 0, 1024);
-		char hello[8192] = {0};
-		int n = read(STDIN_FILENO, hello, 8192);
+		char msg[8192] = {0};
+		int n = read(STDIN_FILENO, msg, 8192);
 		//char *sendMsg = encrypt(hello, strlen(hello), threadargs->key);
-		if(n > 0)
-		send(threadargs->socket , hello , n , 0 );
+		if(n > 0) {
+        	char *ret = encrypt(msg, strlen(msg), threadargs->key);
+		send(threadargs->socket , msg , n , 0 );
+		//send(threadargs->socket , ret , n , 0 );
+		}
 		//free(hello);
 		//free(sendMsg);
 	}
@@ -29,6 +34,7 @@ void *writeOut(void * socket) {
 	while(1) {	
 		char buffer[8192] = {0};
 		int n = read( sock , buffer, 8192);
+		if(n == -1) break;
 		if(n > 0)
 		write(STDOUT_FILENO, buffer, n);
 	}
@@ -36,20 +42,15 @@ void *writeOut(void * socket) {
 
 
 char *encrypt(char *msg, int length, const char* enc_key) {
-	printf("\nmessage: %s, %d, %s",msg, length, enc_key);
+	//printf("\nmessage: %s, %d, %s",msg, length, enc_key);
 	AES_KEY key;
-	char iv[AES_BLOCK_SIZE];
-	char *text = malloc(sizeof(char) * length + AES_BLOCK_SIZE);
-	memset(text, 0, sizeof(char) * length + AES_BLOCK_SIZE);
+	//char *text = malloc(sizeof(char) * length + AES_BLOCK_SIZE);
+	//memset(text, 0, sizeof(char) * length + AES_BLOCK_SIZE);
 	int bytes_to_encrypt = 0;
 	char *encrypted_text = (char *) malloc(sizeof(char) * length);
 	memset(encrypted_text, 0, sizeof(char) * length);
 	char *ret = encrypted_text;
 	ctr state;
-	if(!RAND_bytes(iv, AES_BLOCK_SIZE)) {
-		fprintf(stderr, "Could not create random bytes.");
-		exit(1);
-	}
 	if (AES_set_encrypt_key(enc_key, 128, &key) < 0) {
 		fprintf(stderr, "Could not set encryption key.");
 		exit(1);
@@ -59,11 +60,10 @@ char *encrypt(char *msg, int length, const char* enc_key) {
 	memset(state.iv + 8, 0, 8);
  	memcpy(state.iv, iv, 8);
 	AES_ctr128_encrypt(msg, encrypted_text, length, &key, state.iv, state.count, &state.num);
-	strcat(text, iv);
-	strcat(text, ret);
-	printf("wtf : %s", text);
+	//strcat(text, iv);
+	//strcat(text, ret);
 	//free(ret);
-	return text;
+	return ret;
 	
 }
 
@@ -97,6 +97,20 @@ int startClient(parsedArgs *args) {
         	printf("\nConnection Failed \n");
 		return -1;
 	}
+	if(!RAND_bytes(iv, AES_BLOCK_SIZE)) {
+		fprintf(stderr, "Could not create random bytes.");
+		exit(1);
+	}
+	//printf("\n Connecting");
+	send(sock, iv , AES_BLOCK_SIZE , 0 );
+	int n = read( sock , ivs, 8192);
+	/*char *msg = "Hello Hi There";
+	char *ret = encrypt(msg, strlen(msg), buff);
+        char decrypt[100] = { 0 };
+	send(sock, ret, strlen(ret) , 0 );
+	read( sock , decrypt, 8192);
+	printf("\nmsg orig: %s", msg);	
+	printf("\ndecrypt: %s", decrypt);*/
 	tArgs *ta = (tArgs*) malloc(sizeof(tArgs));
 	ta->socket = sock;
 	ta->key = buff;

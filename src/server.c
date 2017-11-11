@@ -8,13 +8,19 @@
 #include <netinet/in.h>
 #include "pbheader.h"
 
+char* decrypt(char *msg, int length, const char *enc_key);
+char ivc_server[AES_BLOCK_SIZE] = {0};
+char ivs_server[AES_BLOCK_SIZE] = {0};
 void *sshCom(void *threadArgs) {
 	tArgs *tA = (tArgs *) threadArgs;
 	while(1) {
  		char buffer[8192] = {0};
-		//int n = read(tA->socket , buffer, 8192);
+		int n = read(tA->socket , buffer, 8192);
+		char *ret = decrypt(buffer, strlen(buffer), tA->key);
+		if(n <= 0) break;
 		if(n > 0) {
-        	//	send(tA->socket2 , buffer, n , 0 );
+        		send(tA->socket2 , buffer, n , 0 );
+        		//send(tA->socket2 , ret, n , 0 );
 			//printf("\n Buffer: %s", buffer);
 		}
 	}
@@ -25,6 +31,7 @@ void *pbCom(void *threadArgs) {
 	while(1) {
  		char buffer[8192] = {0};
 		int n = read(tA->socket2 , buffer, 8192);
+		if(n <= 0) break;
 		if(n > 0) {
         		send(tA->socket , buffer, n , 0 );	
 			//printf("\n Buffer2: %s", buffer);
@@ -66,11 +73,6 @@ int createSSHConnection(parsedArgs *args) {
 }
 
 char* decrypt(char *msg, int length, const char *enc_key) {
-	char iv[AES_BLOCK_SIZE];
-	for(int i = 0; i < AES_BLOCK_SIZE; i++) {
-		iv[i] = *msg;
-		msg++;
-	}
         AES_KEY key;
         int bytes_to_encrypt = 0;
         char *encrypted_text = (char *) malloc(sizeof(char) * length + 1);
@@ -85,9 +87,8 @@ char* decrypt(char *msg, int length, const char *enc_key) {
         state.num = 0;
         memset(state.count, 0, AES_BLOCK_SIZE);
         memset(state.iv + 8, 0, 8);
-        memcpy(state.iv, iv, 8);
-	int nl = length - AES_BLOCK_SIZE;
-        AES_ctr128_encrypt(msg, encrypted_text, nl, &key, state.iv, state.count, &state.num);
+        memcpy(state.iv, ivc_server, 8);
+        AES_ctr128_encrypt(msg, encrypted_text, length, &key, state.iv, state.count, &state.num);
         return ret; 
 }
 
@@ -119,26 +120,41 @@ int startServer(parsedArgs *args) {
 		perror("bind failed");
 		exit(EXIT_FAILURE);
 	}
-	if (listen(serverFd, 3) < 0) {
-		perror("listen");
-		exit(EXIT_FAILURE);
-	}
-	if ((newSocket = accept(serverFd, (struct sockaddr *)&address, (socklen_t*)&addrLen))<0) {
-		perror("accept");
-		exit(EXIT_FAILURE);
-	}
-	int sshSocket = createSSHConnection(args);	
-	tArgs *ssht = (tArgs*) malloc(sizeof(tArgs));
-	ssht->socket = newSocket;
-	ssht->socket2 = sshSocket;
-	ssht->key = buff;
-	tArgs *pbt = (tArgs*) malloc(sizeof(tArgs));
-	pbt->socket = newSocket;
-	pbt->socket2 = sshSocket;
-	pbt->key = buff;
-	pthread_t tid, tid2;
-	pthread_create(&tid, NULL, sshCom, (void*) ssht);	
-	pthread_create(&tid2, NULL, pbCom, (void*) pbt);
+	//while(1) {
+		if (listen(serverFd, 3) < 0) {
+			perror("listen");
+			exit(EXIT_FAILURE);
+		}
+		if ((newSocket = accept(serverFd, (struct sockaddr *)&address, (socklen_t*)&addrLen))<0) {
+			perror("accept");
+			exit(EXIT_FAILURE);
+		}
+		if(!RAND_bytes(ivs_server, AES_BLOCK_SIZE)) {
+			fprintf(stderr, "Could not create random bytes.");
+			exit(1);
+		}
+		//printf("\n Waiting for a connection");
+		int n = read( newSocket , ivc_server, 8192);
+		send(newSocket, ivs_server, AES_BLOCK_SIZE , 0 );
+	//	printf("\nIV: %s", ivc_server);	
+	//	printf("\nIVS: %s", ivs_server);
+		//char msg[100] = {0};
+		//read( newSocket , msg, 100);
+		//char *ret = decrypt(msg, strlen(msg), buff);
+		//send(newSocket, ret, strlen(ret) , 0 );
+		int sshSocket = createSSHConnection(args);	
+		tArgs *ssht = (tArgs*) malloc(sizeof(tArgs));
+		ssht->socket = newSocket;
+		ssht->socket2 = sshSocket;
+		ssht->key = buff;
+		tArgs *pbt = (tArgs*) malloc(sizeof(tArgs));
+		pbt->socket = newSocket;
+		pbt->socket2 = sshSocket;
+		pbt->key = buff;
+		pthread_t tid, tid2;
+		pthread_create(&tid, NULL, sshCom, (void*) ssht);	
+		pthread_create(&tid2, NULL, pbCom, (void*) pbt);
+	//}
 	pthread_join(tid, NULL);
      	pthread_join(tid2, NULL);
 	/*while(1) {

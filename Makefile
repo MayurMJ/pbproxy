@@ -3,7 +3,7 @@ OBJ_FILES := $(addprefix obj/,$(notdir $(CPP_FILES:.c=.o)))
 #CPP_CLI_FILES := $(wildcard cli/*.c)
 #OBJ_CLI_FILES := $(addprefix obj_cli/,$(notdir $(CPP_CLI_FILES:.c=.o)))
 LD_FLAGS := -lm -lcrypto -lssl -lpthread
-CC_FLAGS := -I include/
+CC_FLAGS := -g -I include/
 
 
 all: pbproxy
