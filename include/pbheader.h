@@ -22,7 +22,9 @@ typedef struct ctrstruct {
 typedef struct threadArgs {
 	int socket;
 	int socket2;
-	const char* key;
+	//const char* key;
+	ctr state;
+	AES_KEY key;
 }tArgs;
 
 int startServer(parsedArgs*);

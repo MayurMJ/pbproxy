@@ -19,10 +19,11 @@ void *readIn(void *tA) {
 		char msg[8192] = {0};
 		int n = read(STDIN_FILENO, msg, 8192);
 		if(n > 0) {
-		char ret[8192] = {0};
-        	encrypt(msg, n, threadargs->key, ret);
-	//	send(threadargs->socket , msg , n , 0 );
-		send(threadargs->socket , ret , n , 0 );
+			char ret[8192] = {0};
+			AES_ctr128_encrypt(msg, ret, n, &(threadargs->key), threadargs->state.iv, threadargs->state.count, &(threadargs->state.num));
+        		//encrypt(msg, n, threadargs->key, ret);
+			//send(threadargs->socket , msg , n , 0 );
+			send(threadargs->socket , ret , n , 0 );
 		}
 		//free(hello);
 		//free(sendMsg);
@@ -42,14 +43,7 @@ void *writeOut(void * socket) {
 
 
 char *encrypt(char *msg, int length, const char* enc_key, char ret[8192]) {
-	//printf("\nmessage: %s, %d, %s",msg, length, enc_key);
 	AES_KEY key;
-	//char *text = malloc(sizeof(char) * length + AES_BLOCK_SIZE);
-	//memset(text, 0, sizeof(char) * length + AES_BLOCK_SIZE);
-	int bytes_to_encrypt = 0;
-	//char *encrypted_text = (char *) malloc(sizeof(char) * length);
-	//memset(encrypted_text, 0, sizeof(char) * length);
-	//char *ret = encrypted_text;
 	ctr state;
 	if (AES_set_encrypt_key(enc_key, 128, &key) < 0) {
 		fprintf(stderr, "Could not set encryption key.");
@@ -60,9 +54,6 @@ char *encrypt(char *msg, int length, const char* enc_key, char ret[8192]) {
 	memset(state.iv + 8, 0, 8);
  	memcpy(state.iv, iv, 8);
 	AES_ctr128_encrypt(msg, ret, length, &key, state.iv, state.count, &state.num);
-	//strcat(text, iv);
-	//strcat(text, ret);
-	//free(ret);
 	return ret;
 	
 }
@@ -103,7 +94,8 @@ int startClient(parsedArgs *args) {
 	}
 	//printf("\n Connecting");
 	send(sock, iv , AES_BLOCK_SIZE , 0 );
-	int n = read( sock , ivs, 8192);
+	int n = read( sock , ivs, 8192);	
+
 	/*char *msg = "Hello Hi There";
 	char *ret = encrypt(msg, strlen(msg), buff);
         char decrypt[100] = { 0 };
@@ -113,7 +105,16 @@ int startClient(parsedArgs *args) {
 	printf("\ndecrypt: %s", decrypt);*/
 	tArgs *ta = (tArgs*) malloc(sizeof(tArgs));
 	ta->socket = sock;
-	ta->key = buff;
+	AES_KEY key;
+        if (AES_set_encrypt_key(buff, 128, &key) < 0) {
+                fprintf(stderr, "Could not set encryption key.");
+                exit(1);
+        }
+        ta->state.num = 0;
+        memset(ta->state.count, 0, AES_BLOCK_SIZE);
+        memset(ta->state.iv + 8, 0, 8);
+        memcpy(ta->state.iv, iv, 8);
+	ta->key = key;
 	pthread_t tid, tid2;
 	pthread_create(&tid, NULL, readIn, (void*) ta);	
 	pthread_create(&tid2, NULL, writeOut, (void*) &sock);
